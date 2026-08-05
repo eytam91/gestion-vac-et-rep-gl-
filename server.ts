@@ -17,8 +17,49 @@ import {
   resetDemoDataInDb,
   clearAllDataInDb,
 } from './src/db/queries.ts';
+import { db } from './src/db/index.ts';
+import { users } from './src/db/schema.ts';
+import { eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev';
+
+async function seedUsers() {
+  const defaultUsers = [
+    { username: 'admin', role: 'ADMIN', name: 'Administrateur', pass: 'admin123' },
+    { username: 'user1', role: 'HR Manager', name: 'Utilisateur 1', pass: 'user123' },
+    { username: 'user2', role: 'HR Manager', name: 'Utilisateur 2', pass: 'user123' },
+    { username: 'user3', role: 'HR Manager', name: 'Utilisateur 3', pass: 'user123' },
+    { username: 'user4', role: 'HR Manager', name: 'Utilisateur 4', pass: 'user123' },
+  ];
+
+  for (const u of defaultUsers) {
+    const email = `${u.username}@local.app`;
+    try {
+      const existingDbUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      const uid = `local-${u.username}`;
+      
+      if (existingDbUser.length === 0) {
+        await db.insert(users).values({
+          uid,
+          email,
+          name: u.name,
+          role: u.role,
+          password: u.pass,
+        });
+        console.log(`Created DB user ${u.username}`);
+      } else if (existingDbUser[0].password !== u.pass) {
+        await db.update(users).set({ password: u.pass }).where(eq(users.email, email));
+        console.log(`Updated DB user password for ${u.username}`);
+      }
+    } catch (error) {
+      console.error(`Failed to seed user ${u.username}`, error);
+    }
+  }
+}
 
 async function startServer() {
+  await seedUsers();
   const app = express();
   const PORT = 3000;
 
@@ -40,6 +81,63 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error syncing auth user:', error);
       res.status(500).json({ error: error.message || 'Failed to sync user' });
+    }
+  });
+
+  // User Custom Login route
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      
+      if (existingUser.length === 0 || existingUser[0].password !== password) {
+        return res.status(401).json({ error: 'Identifiants incorrects.' });
+      }
+      
+      const customToken = jwt.sign({ uid: existingUser[0].uid, email: existingUser[0].email, name: existingUser[0].name, role: existingUser[0].role }, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ token: customToken, user: existingUser[0] });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to login' });
+    }
+  });
+
+  // Users API (Admin only)
+  app.get('/api/users', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const allUsers = await db.select().from(users);
+      res.json(allUsers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to fetch users' });
+    }
+  });
+
+  app.post('/api/users', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { username, name, role, pass } = req.body;
+      const email = `${username.toLowerCase().trim()}@local.app`;
+      const uid = `local-${username.toLowerCase().trim()}`;
+      
+      const newDbUser = await db.insert(users).values({
+        uid,
+        email,
+        name,
+        role: role || 'HR Manager',
+        password: pass,
+      }).returning();
+
+      res.status(201).json(newDbUser[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to create user' });
+    }
+  });
+
+  app.delete('/api/users/:uid', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const uid = req.params.uid;
+      await db.delete(users).where(eq(users.uid, uid));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to delete user' });
     }
   });
 

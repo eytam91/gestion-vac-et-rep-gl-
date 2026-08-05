@@ -20,12 +20,16 @@ import { EmployeeManager } from './components/EmployeeManager';
 import { LedgerHistory } from './components/LedgerHistory';
 import { LeaveLedgerModal } from './components/LeaveLedgerModal';
 import { AuditLogsManager } from './components/AuditLogsManager';
+import { UserManager } from './components/UserManager';
+import { AuthModal } from './components/AuthModal';
 import { registerDeviceConnection, addActivityLog } from './utils/auditLogger';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
-  const { user, signInWithGoogle, logout, idToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'ledger' | 'audit'>('dashboard');
+  const { user, dbUser, signInWithGoogle, logout, idToken } = useAuth();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'ledger' | 'audit' | 'users'>('dashboard');
+  
+  const isAdmin = dbUser?.role === 'ADMIN';
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
@@ -35,6 +39,7 @@ export default function App() {
   // Leave Modal State
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [modalInitialEmployeeId, setModalInitialEmployeeId] = useState<string | undefined>(undefined);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Register Device on Mount
   useEffect(() => {
@@ -329,7 +334,7 @@ export default function App() {
               <span className="hidden sm:inline">Nouveau Congé</span>
             </button>
 
-            {/* Google Authentication Status / Button */}
+            {/* Authentication Status / Button */}
             {user ? (
               <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-xl border border-stone-200">
                 <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
@@ -339,7 +344,7 @@ export default function App() {
                   <p className="text-2xs font-bold text-stone-900 leading-tight truncate max-w-[120px]">
                     {user.displayName || user.email}
                   </p>
-                  <p className="text-[10px] text-emerald-600 font-semibold">Connecté (Google)</p>
+                  <p className="text-[10px] text-emerald-600 font-semibold">Connecté</p>
                 </div>
                 <button
                   onClick={logout}
@@ -351,11 +356,11 @@ export default function App() {
               </div>
             ) : (
               <button
-                onClick={signInWithGoogle}
+                onClick={() => setShowAuthModal(true)}
                 className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-98"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Connexion Google</span>
+                <span>Connexion</span>
               </button>
             )}
           </div>
@@ -415,6 +420,21 @@ export default function App() {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               Audit & Appareils
             </button>
+
+            {isAdmin && (
+              <button
+                id="tab-users"
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
+                  activeTab === 'users'
+                    ? 'border-stone-900 text-stone-900 bg-white'
+                    : 'border-transparent text-stone-500 hover:text-stone-800 hover:bg-stone-100/50'
+                }`}
+              >
+                <UserIcon className="w-4 h-4 text-indigo-600" />
+                Utilisateurs
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -486,9 +506,17 @@ export default function App() {
                 leaveRecordCount={leaveRecords.length}
               />
             )}
+
+            {activeTab === 'users' && isAdmin && (
+              <UserManager />
+            )}
           </>
         )}
       </main>
+
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
 
       {/* Admin Leave Modal */}
       <LeaveLedgerModal
