@@ -28,11 +28,6 @@ export const LEAVE_TYPE_COLORS: Record<LeaveType, { bg: string; text: string; bo
 
 /**
  * Calcule toutes les métriques du solde de congés, solde négatif et régularisation d'un employé.
- * Improvements:
- * - Ignore future leave records (start date after `currentDateStr`).
- * - For ongoing leaves (start <= now <= end) count only the days up to `now`.
- * - Use the leave record dates to compute effective days taken up to `currentDateStr` instead of trusting the provided daysCount
- *   when part of the leave is still in the future. This makes the "current balance" reflect what has actually been consumed.
  */
 export function calculateEmployeeStats(
   employee: Employee,
@@ -67,58 +62,34 @@ export function calculateEmployeeStats(
   let decesDays = 0;
   let autreDays = 0;
 
-  const msPerDay = 1000 * 60 * 60 * 24;
-
-  function effectiveDaysTaken(record: LeaveRecord): number {
-    // Compute how many days from this record have been consumed up to `now`.
-    // If the record starts in the future, return 0.
-    const start = new Date(record.startDate);
-    const end = new Date(record.endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return record.daysCount || 0;
-    if (start.getTime() > now.getTime()) return 0; // future leave - not yet consumed
-
-    const effectiveEnd = end.getTime() > now.getTime() ? now : end;
-    // Inclusive day count: floor(diff / msPerDay) + 1
-    const days = Math.floor((effectiveEnd.getTime() - start.getTime()) / msPerDay) + 1;
-    if (days < 0) return 0;
-    return days;
-  }
-
   empRecords.forEach((r) => {
-    // If the request is unpaid (without balance)
+    // Si la demande est non payée (sans solde)
     if (r.isPaid === false) {
-      // unpaid leave may also be in the future; count only consumed portion
-      unpaidLeaveDays += effectiveDaysTaken(r);
+      unpaidLeaveDays += r.daysCount;
       return;
     }
 
-    // Count only days that have already occurred (ignore purely future days)
-    const daysConsumed = effectiveDaysTaken(r);
-    if (daysConsumed === 0) return;
-
     switch (r.leaveType) {
       case 'CONGE_PAYE':
-        congePayeDays += daysConsumed;
+        congePayeDays += r.daysCount;
         break;
       case 'RECUPERATION_JOURS':
-        recuperationDays += daysConsumed;
+        recuperationDays += r.daysCount;
         break;
       case 'MALADIE_JUSTIFIEE':
-        maladieDays += daysConsumed;
+        maladieDays += r.daysCount;
         break;
       case 'PATERNITE':
-        paterniteDays += daysConsumed;
+        paterniteDays += r.daysCount;
         break;
       case 'MARIAGE':
-        mariageDays += daysConsumed;
+        mariageDays += r.daysCount;
         break;
       case 'DECES':
-        decesDays += daysConsumed;
+        decesDays += r.daysCount;
         break;
       case 'AUTRE':
-        autreDays += daysConsumed;
-        break;
-      default:
+        autreDays += r.daysCount;
         break;
     }
   });
