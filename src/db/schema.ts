@@ -12,7 +12,10 @@ export const users = pgTable('users', {
 
 export const employees = pgTable('employees', {
   id: text('id').primaryKey(),
+  idNumber: text('id_number').notNull().default(''),
   name: text('name').notNull(),
+  position: text('position').notNull().default(''),
+  status: text('status').notNull().default('LOCAL'),
   hireDate: text('hire_date').notNull(),
   contractType: text('contract_type').notNull().default('TYPE_A'),
   createdAt: text('created_at').notNull(),

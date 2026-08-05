@@ -120,6 +120,32 @@ export default function App() {
   };
 
   // Handlers for Employee
+  const handleBatchImportEmployees = async (importedEmployees: Employee[]) => {
+    try {
+      const res = await fetch('/api/employees/batch', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(importedEmployees),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        await fetchData();
+
+        addActivityLog({
+          action: 'EMPLOYEE_CREATED',
+          actionLabel: 'Import Multiple Employés',
+          details: `Import CSV: ${result.insertedCount} employés ajoutés, ${result.updatedCount} mis à jour dans Cloud SQL.`,
+        });
+      } else {
+        const err = await res.json();
+        alert(`Erreur lors de l'import : ${err.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to batch import employees:', err);
+      alert("Erreur lors de l'import CSV");
+    }
+  };
+
   const handleAddEmployee = async (newEmpData: Omit<Employee, 'id' | 'createdAt'>) => {
     const newEmp: Employee = {
       ...newEmpData,
@@ -438,6 +464,7 @@ export default function App() {
                 onAddEmployee={handleAddEmployee}
                 onUpdateEmployee={handleUpdateEmployee}
                 onDeleteEmployee={handleDeleteEmployee}
+                onBatchImportEmployees={handleBatchImportEmployees}
                 onOpenLeaveModal={handleOpenLeaveModal}
               />
             )}

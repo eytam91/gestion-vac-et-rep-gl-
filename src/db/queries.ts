@@ -5,33 +5,11 @@ import type { Employee, LeaveRecord, ActivityLog } from '../types.ts';
 import { SAMPLE_DEMO_EMPLOYEES, SAMPLE_DEMO_LEAVE_RECORDS } from '../utils/vacationCalc.ts';
 
 export async function seedIfEmpty() {
-  try {
-    const existingEmp = await db.select().from(employees);
-    if (existingEmp.length === 0) {
-      for (const emp of SAMPLE_DEMO_EMPLOYEES) {
-        await db.insert(employees).values(emp).onConflictDoNothing();
-      }
-      for (const rec of SAMPLE_DEMO_LEAVE_RECORDS) {
-        await db.insert(leaveRecords).values(rec).onConflictDoNothing();
-      }
-      await db.insert(auditLogs).values({
-        id: 'log-init-seed',
-        timestamp: new Date().toISOString(),
-        action: 'DATA_RESET',
-        actionLabel: 'Initialisation Cloud SQL',
-        details: 'Initialisation de la base de données PostgreSQL Cloud SQL avec le jeu de données RH.',
-        deviceId: 'cloud-server',
-        deviceType: 'Desktop',
-      }).onConflictDoNothing();
-    }
-  } catch (error) {
-    console.error('Error seeding Cloud SQL database:', error);
-  }
+  // Do not auto-seed fake demo data in production so the database stays completely clean
 }
 
 export async function getAllEmployees(): Promise<Employee[]> {
   try {
-    await seedIfEmpty();
     const rows = await db.select().from(employees);
     return rows as Employee[];
   } catch (error) {
@@ -47,6 +25,31 @@ export async function createEmployee(data: Employee): Promise<Employee> {
   } catch (error) {
     console.error('Database insert failed (createEmployee):', error);
     throw new Error('Database insert failed', { cause: error });
+  }
+}
+
+export async function createEmployeesBatch(dataList: Employee[]): Promise<Employee[]> {
+  try {
+    if (dataList.length === 0) return [];
+    const insertedRows: Employee[] = [];
+    for (const item of dataList) {
+      const [inserted] = await db.insert(employees).values(item).onConflictDoUpdate({
+        target: employees.id,
+        set: {
+          idNumber: item.idNumber,
+          name: item.name,
+          position: item.position,
+          status: item.status,
+          hireDate: item.hireDate,
+          contractType: item.contractType,
+        }
+      }).returning();
+      insertedRows.push(inserted as Employee);
+    }
+    return insertedRows;
+  } catch (error) {
+    console.error('Database batch insert failed (createEmployeesBatch):', error);
+    throw new Error('Database batch insert failed', { cause: error });
   }
 }
 
@@ -75,7 +78,6 @@ export async function deleteEmployee(id: string): Promise<void> {
 
 export async function getAllLeaveRecords(): Promise<LeaveRecord[]> {
   try {
-    await seedIfEmpty();
     const rows = await db.select().from(leaveRecords);
     return rows as LeaveRecord[];
   } catch (error) {
@@ -105,7 +107,6 @@ export async function deleteLeaveRecord(id: string): Promise<void> {
 
 export async function getAllAuditLogs(): Promise<ActivityLog[]> {
   try {
-    await seedIfEmpty();
     const rows = await db.select().from(auditLogs).orderBy(desc(auditLogs.timestamp));
     return rows as ActivityLog[];
   } catch (error) {

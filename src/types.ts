@@ -1,4 +1,5 @@
 export type ContractType = 'TYPE_A' | 'TYPE_B';
+export type EmployeeStatus = 'LOCAL' | 'EXPAT';
 
 export type LeaveType =
   | 'CONGE_PAYE'
@@ -13,7 +14,10 @@ export type LedgerEntryType = 'ACCRUAL' | 'LEAVE_TAKEN' | 'RECUPERATION';
 
 export interface Employee {
   id: string;
+  idNumber: string; // N° Matricule / ID Employé unique (ex: MAT-001)
   name: string;
+  position: string; // Intitulé du poste / fonction (ex: Ingénieur Projet, Superviseur Site)
+  status: EmployeeStatus; // 'LOCAL' (Personnel Local) ou 'EXPAT' (Expatrié)
   hireDate: string; // Date d'embauche ISO YYYY-MM-DD
   contractType: ContractType; // TYPE_A (30j / 6 mois) ou TYPE_B (30j / 12 mois)
   createdAt: string;
@@ -34,7 +38,7 @@ export interface LeaveRecord {
 export interface ActivityLog {
   id: string;
   timestamp: string;
-  action: 'EMPLOYEE_CREATED' | 'EMPLOYEE_UPDATED' | 'EMPLOYEE_DELETED' | 'LEAVE_ADDED' | 'LEAVE_DELETED' | 'DATA_RESET' | 'DATA_CLEARED' | 'DEVICE_CONNECTED';
+  action: 'EMPLOYEE_CREATED' | 'EMPLOYEE_UPDATED' | 'EMPLOYEE_DELETED' | 'EMPLOYEES_IMPORTED' | 'LEAVE_ADDED' | 'LEAVE_DELETED' | 'DATA_RESET' | 'DATA_CLEARED' | 'DEVICE_CONNECTED';
   actionLabel: string;
   details: string;
   targetId?: string;

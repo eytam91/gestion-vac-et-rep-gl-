@@ -6,6 +6,7 @@ import { getOrCreateUser } from './src/db/users.ts';
 import {
   getAllEmployees,
   createEmployee,
+  createEmployeesBatch,
   updateEmployee,
   deleteEmployee,
   getAllLeaveRecords,
@@ -58,6 +59,19 @@ async function startServer() {
       res.status(201).json(newEmp);
     } catch (error: any) {
       res.status(500).json({ error: error.message || 'Failed to create employee' });
+    }
+  });
+
+  app.post('/api/employees/batch', async (req, res) => {
+    try {
+      const employeesList = req.body;
+      if (!Array.isArray(employeesList)) {
+        return res.status(400).json({ error: 'Expected an array of employees' });
+      }
+      const saved = await createEmployeesBatch(employeesList);
+      res.status(201).json(saved);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to batch import employees' });
     }
   });
 

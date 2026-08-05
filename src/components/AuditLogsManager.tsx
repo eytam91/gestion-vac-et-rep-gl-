@@ -14,7 +14,8 @@ import {
   Clock, 
   Database,
   FileCode,
-  UserCheck
+  UserCheck,
+  Server
 } from 'lucide-react';
 import { ActivityLog, DeviceSession } from '../types';
 import { getActivityLogs, getDeviceSessions, clearAuditLogs, getOrCreateDeviceId } from '../utils/auditLogger';
@@ -76,24 +77,6 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const handleExportBackupJSON = () => {
-    const backupData = {
-      exportedAt: new Date().toISOString(),
-      employees: localStorage.getItem('app_employees_v7') || '[]',
-      leaveRecords: localStorage.getItem('app_leave_records_v7') || '[]',
-      deviceSessions: localStorage.getItem('app_device_sessions_v1') || '[]',
-      activityLogs: localStorage.getItem('app_activity_logs_v1') || '[]',
-    };
-
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `sauvegarde_rh_complete_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const getDeviceIcon = (type: string) => {
     switch (type) {
       case 'Mobile':
@@ -112,27 +95,20 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-emerald-600" />
-            <h2 className="text-xl font-bold text-stone-900">Registre d'Audit & Appareils Connectés</h2>
+            <h2 className="text-xl font-bold text-stone-900">Registre d'Audit & Base Cloud SQL</h2>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            Traçabilité complète des actions RH, des enregistrements de congés et enregistrement automatique des appareils ayant accédé à cette instance.
+            Traçabilité des actions RH, synchronisation multi-appareils en temps réel avec Cloud SQL PostgreSQL (europe-west1).
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleExportAuditCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-2xs"
           >
             <Download className="w-3.5 h-3.5 text-amber-400" />
             Exporter Logs (CSV)
-          </button>
-          <button
-            onClick={handleExportBackupJSON}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs"
-          >
-            <FileCode className="w-3.5 h-3.5" />
-            Sauvegarde JSON
           </button>
         </div>
       </div>
@@ -172,7 +148,7 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
           }`}
         >
           <Database className="w-4 h-4 text-amber-400" />
-          Gestion & Maintenance de la Base
+          Base de Données PostgreSQL
         </button>
       </div>
 
@@ -188,7 +164,7 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
                 placeholder="Rechercher une action, appareil..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
@@ -197,7 +173,7 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
-                className="text-xs bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-amber-500 font-medium"
+                className="text-xs bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
               >
                 <option value="ALL">Toutes les actions</option>
                 <option value="EMPLOYEE_CREATED">Créations d'employés</option>
@@ -328,40 +304,32 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2 text-stone-900 font-bold text-base">
-              <Database className="w-5 h-5 text-amber-500" />
-              État de la Base de Données Directe
+              <Server className="w-5 h-5 text-amber-500" />
+              État de la Base PostgreSQL Cloud SQL
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
-                <span className="block text-2xl font-extrabold text-stone-900">{employeeCount}</span>
+                <span className="block text-2xl font-extrabold text-stone-900 font-mono">{employeeCount}</span>
                 <span className="text-xs text-stone-500 font-semibold">Employés Enregistrés</span>
               </div>
 
               <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
-                <span className="block text-2xl font-extrabold text-stone-900">{leaveRecordCount}</span>
+                <span className="block text-2xl font-extrabold text-stone-900 font-mono">{leaveRecordCount}</span>
                 <span className="text-xs text-stone-500 font-semibold">Saisies de Congés</span>
               </div>
             </div>
 
             <div className="border-t border-stone-100 pt-4 space-y-3">
-              <h4 className="text-xs font-bold text-stone-700 uppercase tracking-wider">Actions de Structure & Démarrage</h4>
+              <h4 className="text-xs font-bold text-stone-700 uppercase tracking-wider">Actions de Base</h4>
 
               <div className="space-y-2">
-                <button
-                  onClick={onResetDemoData}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold px-4 py-2.5 rounded-xl transition-all border border-stone-300 cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4 text-amber-600" />
-                  Charger le Jeu de Données Démo (Employé X)
-                </button>
-
                 <button
                   onClick={onClearAllData}
                   className="w-full inline-flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all border border-red-200 cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4 text-red-600" />
-                  Vider Complètement la Base (Prêt pour Production Réelle)
+                  Vider la Base (Effacer tous les enregistrements)
                 </button>
               </div>
             </div>
@@ -370,19 +338,17 @@ export const AuditLogsManager: React.FC<AuditLogsManagerProps> = ({
           <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2 text-stone-900 font-bold text-base">
               <UserCheck className="w-5 h-5 text-emerald-600" />
-              Démarrage Propre Réel
+              Schéma PostgreSQL Actif
             </div>
 
-            <p className="text-xs text-stone-600 leading-relaxed">
-              Pour commencer la gestion réelle de vos employés :
-            </p>
-
-            <ol className="text-xs text-stone-600 space-y-2 list-decimal list-inside bg-stone-50 p-3.5 rounded-xl border border-stone-200">
-              <li>Utilisez le bouton <strong>"Vider Complètement la Base"</strong> si vous souhaitez partir de zéro.</li>
-              <li>Accédez à l'onglet <strong>"Gestion des Employés"</strong> pour ajouter vos collaborateurs réels (Type A ou Type B).</li>
-              <li>Chaque ajout, congé ou modification est immédiatement enregistré localement de façon persistante.</li>
-              <li>Toutes les activités et les détails des appareils sont suivis dans l'onglet <strong>"Registre d'Audit"</strong>.</li>
-            </ol>
+            <div className="text-xs text-stone-600 space-y-2 bg-stone-50 p-3.5 rounded-xl border border-stone-200 font-mono text-[11px]">
+              <p className="font-bold text-stone-800 font-sans">Tables & Colonnes:</p>
+              <ul className="space-y-1 text-stone-600 list-disc list-inside">
+                <li><strong className="text-stone-900">employees:</strong> id, id_number, name, position, status ('LOCAL' | 'EXPAT'), hire_date, contract_type ('TYPE_A' | 'TYPE_B')</li>
+                <li><strong className="text-stone-900">leave_records:</strong> id, employee_id, start_date, end_date, days_count, leave_type, is_paid, notes</li>
+                <li><strong className="text-stone-900">audit_logs:</strong> id, action, action_label, details, device_id, device_type, timestamp</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}

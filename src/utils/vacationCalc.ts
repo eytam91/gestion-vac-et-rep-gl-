@@ -136,28 +136,40 @@ export const INITIAL_LEAVE_RECORDS: LeaveRecord[] = [];
 export const SAMPLE_DEMO_EMPLOYEES: Employee[] = [
   {
     id: 'emp-x',
-    name: 'Employé X (Alexandre - Type B)',
+    idNumber: 'MAT-0001',
+    name: 'Employé X (Alexandre)',
+    position: 'Superviseur de Site',
+    status: 'EXPAT',
     hireDate: '2024-06-01',
     contractType: 'TYPE_B', // 30 jours par an (Embauché le 01/06/2024)
     createdAt: new Date('2024-06-01').toISOString(),
   },
   {
     id: 'emp-101',
+    idNumber: 'MAT-0012',
     name: 'Karim Alami',
+    position: 'Ingénieur Projet Senior',
+    status: 'LOCAL',
     hireDate: '2024-01-15',
     contractType: 'TYPE_A', // 30 jours tous les 6 mois (182.5 jours de travail)
     createdAt: new Date('2024-01-15').toISOString(),
   },
   {
     id: 'emp-102',
+    idNumber: 'MAT-0015',
     name: 'Sophie Laurent',
+    position: 'Responsable Ressources Humaines',
+    status: 'LOCAL',
     hireDate: '2024-06-01',
     contractType: 'TYPE_A',
     createdAt: new Date('2024-06-01').toISOString(),
   },
   {
     id: 'emp-103',
+    idNumber: 'MAT-0020',
     name: 'Jean-Pierre Dubois',
+    position: 'Directeur des Opérations',
+    status: 'EXPAT',
     hireDate: '2025-02-10',
     contractType: 'TYPE_B', // 30 jours par an (365 jours de travail)
     createdAt: new Date('2025-02-10').toISOString(),

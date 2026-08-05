@@ -69,11 +69,11 @@ export const VacationSimulator: React.FC<VacationSimulatorProps> = ({
             <select
               value={selectedEmpId}
               onChange={(e) => setSelectedEmpId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-stone-900/10"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-900 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-stone-900/10"
             >
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name} ({emp.contractType === 'TYPE_A' ? 'Type A - 6 Mois' : 'Type B - 1 An'})
+                  [{emp.idNumber || 'SANS-MAT'}] {emp.name} — {emp.position || 'Collaborateur'} ({emp.status === 'EXPAT' ? 'Expatrié' : 'Personnel Local'})
                 </option>
               ))}
             </select>
@@ -117,6 +117,14 @@ export const VacationSimulator: React.FC<VacationSimulatorProps> = ({
           {/* Informations sur l'employé sélectionné */}
           <div className="pt-2 border-t border-stone-200/80 text-xs space-y-1.5 text-stone-600">
             <div className="flex justify-between">
+              <span>Matricule :</span>
+              <span className="font-mono font-bold text-stone-800">{selectedEmployee.idNumber || 'SANS-MAT'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Poste & Statut :</span>
+              <span className="font-semibold text-stone-800">{selectedEmployee.position || 'Collaborateur'} ({selectedEmployee.status})</span>
+            </div>
+            <div className="flex justify-between">
               <span>Date d'embauche :</span>
               <span className="font-semibold text-stone-800">{new Date(selectedEmployee.hireDate).toLocaleDateString('fr-FR')}</span>
             </div>
@@ -134,7 +142,7 @@ export const VacationSimulator: React.FC<VacationSimulatorProps> = ({
               Résultat de la Simulation
             </span>
             <span className="text-2xs font-mono text-stone-400">
-              {selectedEmployee.name}
+              [{selectedEmployee.idNumber}] {selectedEmployee.name}
             </span>
           </div>
 

@@ -5,7 +5,9 @@ import {
   PlusCircle,
   Banknote,
   CheckCircle2,
-  HelpCircle
+  HelpCircle,
+  Globe,
+  Building2
 } from 'lucide-react';
 import { Employee, LeaveRecord, LeaveType } from '../types';
 import { calculateEmployeeStats, LEAVE_TYPE_LABELS } from '../utils/vacationCalc';
@@ -109,7 +111,7 @@ export const LeaveLedgerModal: React.FC<LeaveLedgerModalProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-stone-900">Saisie d'un Congé (Passé ou Actuel)</h3>
-              <p className="text-2xs text-stone-500">Enregistrez l'historique des congés antérieurs ou de nouvelles demandes pour calculer le solde (solde)</p>
+              <p className="text-2xs text-stone-500">Enregistrez l'historique des congés antérieurs ou de nouvelles demandes</p>
             </div>
           </div>
           <button
@@ -136,11 +138,11 @@ export const LeaveLedgerModal: React.FC<LeaveLedgerModalProps> = ({
             <select
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-stone-900/10 font-medium transition-all"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-900 text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-stone-900/10 font-medium transition-all"
             >
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name} ({emp.contractType === 'TYPE_A' ? 'Type A - 30j / 6 mois' : 'Type B - 30j / 12 mois'})
+                  [{emp.idNumber || 'SANS-MAT'}] {emp.name} — {emp.position || 'Collaborateur'} ({emp.status === 'EXPAT' ? 'Expatrié' : 'Personnel Local'} • {emp.contractType === 'TYPE_A' ? 'Type A 6m' : 'Type B 12m'})
                 </option>
               ))}
             </select>
