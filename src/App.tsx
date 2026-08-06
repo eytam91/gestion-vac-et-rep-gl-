@@ -26,7 +26,7 @@ import { registerDeviceConnection, addActivityLog } from './utils/auditLogger';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
-  const { user, dbUser, signInWithGoogle, logout, idToken } = useAuth();
+  const { user, dbUser, logout, idToken, socket } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'ledger' | 'audit' | 'users'>('dashboard');
   
   const isAdmin = dbUser?.role === 'ADMIN';
@@ -75,6 +75,56 @@ export default function App() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Realtime updates: apply server deltas
+  useEffect(() => {
+    if (!socket) return;
+
+    const handler = (payload: any) => {
+      try {
+        const { table, op, id, row } = payload;
+        if (table === 'employees') {
+          if (op === 'INSERT' || op === 'UPSERT') {
+            setEmployees((prev) => [row, ...prev.filter((e) => e.id !== id)]);
+          } else if (op === 'UPDATE') {
+            setEmployees((prev) => prev.map((e) => (e.id === id ? row : e)));
+          } else if (op === 'DELETE') {
+            setEmployees((prev) => prev.filter((e) => e.id !== id));
+          } else if (op === 'RESET') {
+            fetchData();
+          } else if (op === 'CLEAR') {
+            setEmployees([]);
+            setLeaveRecords([]);
+          }
+        } else if (table === 'leave_records') {
+          if (op === 'INSERT') {
+            setLeaveRecords((prev) => [row, ...prev.filter((r) => r.id !== id)]);
+          } else if (op === 'DELETE') {
+            setLeaveRecords((prev) => prev.filter((r) => r.id !== id));
+          }
+        } else if (table === 'audit_logs') {
+          if (op === 'INSERT') {
+            setLeaveRecords((prev) => prev); // no-op for audit in this state; components fetch separately
+          }
+        } else if (table === 'users') {
+          // If users change, nothing in main state except Admin view; refetch when admin tab open
+          if (activeTab === 'users') {
+            fetch('/api/users', { headers: { 'Content-Type': 'application/json', Authorization: idToken ? `Bearer ${idToken}` : '' } })
+              .then((r) => r.json())
+              .then((data) => { /* no-op here; UserManager will fetch when mounted */ })
+              .catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('Failed to apply realtime payload', err);
+      }
+    };
+
+    socket.on('realtime', handler);
+    return () => {
+      socket.off('realtime', handler);
+    };
+  }, [socket, idToken, activeTab]);
 
   const getAuthHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -134,12 +184,13 @@ export default function App() {
       });
       if (res.ok) {
         const result = await res.json();
-        await fetchData();
+        // rely on realtime events to update UI; fetchData as fallback
+        // await fetchData();
 
         addActivityLog({
           action: 'EMPLOYEE_CREATED',
           actionLabel: 'Import Multiple Employés',
-          details: `Import CSV: ${result.insertedCount} employés ajoutés, ${result.updatedCount} mis à jour dans Cloud SQL.`,
+          details: `Import CSV: ${result.length} employés ajoutés/mis à jour dans Cloud SQL.`,
         });
       } else {
         const err = await res.json();
@@ -197,6 +248,10 @@ export default function App() {
           details: `Mise à jour de ${saved.name} dans Cloud SQL`,
           targetId: saved.id,
         });
+      } else if (res.status === 409) {
+        const body = await res.json();
+        alert('Conflit détecté : la ressource a été modifiée par un autre utilisateur. Actualisez et réessayez.');
+        // Optionally merge using body.latest
       }
     } catch (err) {
       console.error('Failed to update employee:', err);
@@ -328,7 +383,7 @@ export default function App() {
             <button
               id="btn-quick-add-absence"
               onClick={() => handleOpenLeaveModal()}
-              className="inline-flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-98"
+              className="inline-flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:scale[...]"
             >
               <Plus className="w-4 h-4 text-amber-400" />
               <span className="hidden sm:inline">Nouveau Congé</span>
@@ -357,7 +412,7 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-98"
+                className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:s[...]"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Connexion</span>
@@ -445,7 +500,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-indigo-300 animate-pulse" />
             <span>
-              <strong>Base PostgreSQL Cloud SQL Active:</strong> Toutes les données (Employés, Registre des Congés, Audit) sont centralisées et synchronisées entre tous vos appareils connectés.
+              <strong>Base PostgreSQL Cloud SQL Active:</strong> Toutes les données (Employés, Registre des Congés, Audit) sont centralisées et synchronisées entre tous vos appareils connect[...] 
             </span>
           </div>
           <div className="flex items-center gap-3">
