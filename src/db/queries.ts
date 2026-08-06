@@ -31,22 +31,28 @@ export async function createEmployee(data: Employee): Promise<Employee> {
 export async function createEmployeesBatch(dataList: Employee[]): Promise<Employee[]> {
   try {
     if (dataList.length === 0) return [];
-    const insertedRows: Employee[] = [];
-    for (const item of dataList) {
-      const [inserted] = await db.insert(employees).values(item).onConflictDoUpdate({
-        target: employees.id,
-        set: {
-          idNumber: item.idNumber,
-          name: item.name,
-          position: item.position,
-          status: item.status,
-          hireDate: item.hireDate,
-          contractType: item.contractType,
-        }
-      }).returning();
-      insertedRows.push(inserted as Employee);
-    }
-    return insertedRows;
+
+    // Use a transaction so the batch is atomic
+    const result = await db.transaction(async (tx) => {
+      const insertedRows: Employee[] = [];
+      for (const item of dataList) {
+        const [inserted] = await tx.insert(employees).values(item).onConflictDoUpdate({
+          target: employees.id,
+          set: {
+            idNumber: item.idNumber,
+            name: item.name,
+            position: item.position,
+            status: item.status,
+            hireDate: item.hireDate,
+            contractType: item.contractType,
+          },
+        }).returning();
+        insertedRows.push(inserted as Employee);
+      }
+      return insertedRows;
+    });
+
+    return result as Employee[];
   } catch (error) {
     console.error('Database batch insert failed (createEmployeesBatch):', error);
     throw new Error('Database batch insert failed', { cause: error });
@@ -127,24 +133,33 @@ export async function createAuditLog(data: ActivityLog): Promise<ActivityLog> {
 
 export async function resetDemoDataInDb() {
   try {
-    await db.delete(leaveRecords);
-    await db.delete(employees);
-    for (const emp of SAMPLE_DEMO_EMPLOYEES) {
-      await db.insert(employees).values(emp);
-    }
-    for (const rec of SAMPLE_DEMO_LEAVE_RECORDS) {
-      await db.insert(leaveRecords).values(rec);
-    }
+    // Run reset inside a transaction so it's atomic
+    await db.transaction(async (tx) => {
+      await tx.delete(leaveRecords);
+      await tx.delete(employees);
+
+      for (const emp of SAMPLE_DEMO_EMPLOYEES) {
+        await tx.insert(employees).values(emp);
+      }
+      for (const rec of SAMPLE_DEMO_LEAVE_RECORDS) {
+        await tx.insert(leaveRecords).values(rec);
+      }
+    });
   } catch (error) {
     console.error('Failed to reset demo data in Cloud SQL:', error);
+    throw new Error('Failed to reset demo data in Cloud SQL', { cause: error });
   }
 }
 
 export async function clearAllDataInDb() {
   try {
-    await db.delete(leaveRecords);
-    await db.delete(employees);
+    // Use a transaction to ensure both deletes happen together
+    await db.transaction(async (tx) => {
+      await tx.delete(leaveRecords);
+      await tx.delete(employees);
+    });
   } catch (error) {
     console.error('Failed to clear data in Cloud SQL:', error);
+    throw new Error('Failed to clear data in Cloud SQL', { cause: error });
   }
 }
