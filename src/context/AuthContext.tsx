@@ -1,18 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  User as FirebaseUser, 
-  onAuthStateChanged, 
-  signOut,
-  signInWithPopup
-} from 'firebase/auth';
-import { auth, googleAuthProvider } from '../lib/firebase';
+import { io, Socket } from 'socket.io-client';
 
 interface AuthContextType {
-  user: any | null; // Changed to any to support both Firebase and Local users
+  user: any | null;
   dbUser: any | null;
   idToken: string | null;
+  socket: Socket | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
@@ -22,8 +16,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   dbUser: null,
   idToken: null,
+  socket: null,
   loading: true,
-  signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   logout: async () => {},
   getToken: async () => null,
@@ -33,72 +27,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<any | null>(null);
   const [dbUser, setDbUser] = useState<any | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check local storage first
+    // Try restore local token
     const localToken = localStorage.getItem('localAuthToken');
     if (localToken) {
       setIdToken(localToken);
       fetch('/api/auth/sync', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localToken}`,
-        },
-      }).then(async res => {
-        if (res.ok) {
-          const data = await res.json();
-          setDbUser(data);
-          setUser({ displayName: data.name, email: data.email });
-        } else {
-          localStorage.removeItem('localAuthToken');
-          setIdToken(null);
-        }
-        setLoading(false);
-      }).catch(() => {
-        setLoading(false);
-      });
-    } else {
-      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        setUser(currentUser);
-        if (currentUser) {
-          try {
-            const token = await currentUser.getIdToken();
-            setIdToken(token);
-            // Sync with server
-            const res = await fetch('/api/auth/sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            if (res.ok) {
-              const data = await res.json();
-              setDbUser(data);
-            }
-          } catch (err) {
-            console.error('Failed to get token or sync user:', err);
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localToken}` },
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            setDbUser(data);
+            setUser({ displayName: data.name, email: data.email });
+          } else {
+            localStorage.removeItem('localAuthToken');
+            setIdToken(null);
           }
-        } else {
-          setIdToken(null);
-          setDbUser(null);
-        }
-        setLoading(false);
-      });
-      return () => unsubscribe();
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, []);
 
-  const signInWithGoogle = async () => {
-    try {
-      await signInWithPopup(auth, googleAuthProvider);
-    } catch (error) {
-      console.error('Google Sign-In failed:', error);
-      throw error;
+  // Connect realtime socket when idToken is available
+  useEffect(() => {
+    if (!idToken) {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+      return;
     }
-  };
+
+    const s = io('/', { auth: { token: idToken } });
+    setSocket(s);
+    s.on('connect', () => {
+      console.log('Realtime socket connected');
+    });
+    s.on('connect_error', (err: any) => {
+      console.error('Realtime socket connect_error', err);
+    });
+
+    return () => {
+      s.disconnect();
+      setSocket(null);
+    };
+  }, [idToken]);
 
   const signInWithEmail = async (email: string, pass: string) => {
     try {
@@ -107,59 +88,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass }),
       });
-      
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Identifiants incorrects.');
+        throw new Error(data.error || 'Login failed');
       }
-      
       const { token, user: dbUserResponse } = await res.json();
       localStorage.setItem('localAuthToken', token);
       setIdToken(token);
       setDbUser(dbUserResponse);
       setUser({ displayName: dbUserResponse.name, email: dbUserResponse.email });
-    } catch (error) {
-      console.error('Email Sign-In failed:', error);
-      throw error;
+    } catch (err) {
+      console.error('Email Sign-In failed:', err);
+      throw err;
     }
   };
 
   const logout = async () => {
     try {
       localStorage.removeItem('localAuthToken');
-      await signOut(auth);
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
       setUser(null);
       setDbUser(null);
       setIdToken(null);
-    } catch (error) {
-      console.error('Sign-out failed:', error);
+    } catch (err) {
+      console.error('Sign-out failed:', err);
     }
   };
 
   const getToken = async () => {
     const localToken = localStorage.getItem('localAuthToken');
     if (localToken) return localToken;
-
-    if (auth.currentUser) {
-      const token = await auth.currentUser.getIdToken(true);
-      setIdToken(token);
-      return token;
-    }
     return null;
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        dbUser,
-        idToken,
-        loading,
-        signInWithGoogle,
-        signInWithEmail,
-        logout,
-        getToken,
-      }}
+      value={{ user, dbUser, idToken, socket, loading, signInWithEmail, logout, getToken }}
     >
       {children}
     </AuthContext.Provider>
